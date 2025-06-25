@@ -8,8 +8,7 @@ import { MongoClient } from 'mongodb';
  */
 function getMongoDbDatabaseName(connectionString) {
 	const url = new URL(connectionString);
-	const database = url.pathname.slice(1);
-	return database;
+	return url.pathname.slice(1);
 }
 
 export class MongoAdapter {

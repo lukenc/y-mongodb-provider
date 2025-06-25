@@ -4,6 +4,8 @@ import * as promise from 'lib0/promise';
 import { MongoAdapter } from './mongo-adapter.js';
 import * as U from './utils.js';
 
+const APPLY_FULL_STATUS = 'applyFull';
+
 export class MongodbPersistence {
 	/**
 	 * Create a y-mongodb persistence instance.
@@ -47,13 +49,14 @@ export class MongodbPersistence {
 		this.tr = {};
 
 		/**
-		 * Execute an transaction on a database. This will ensure that other processes are
+		 * Execute a transaction on a database. This will ensure that other processes are
 		 * currently not writing.
 		 *
 		 * This is a private method and might change in the future.
 		 *
 		 * @template T
 		 *
+		 * @param docName The name of the document
 		 * @param {function(MongoAdapter):Promise<T>} f A transaction that receives the db object
 		 * @return {Promise<T>}
 		 */
@@ -108,18 +111,31 @@ export class MongodbPersistence {
 						Y.applyUpdate(ydoc, updates[i]);
 					} catch (e) {
 						console.warn(`Failed to apply update ${i} to document "${docName}".`, e);
+						break;
 					}
 					applyNum += 1;
 				}
 			});
-			if (updates.length > this.flushSize && applyNum === updates.length) {
-				// 情况1: 更新数量超过阈值并且全部应用成功，执行文档刷新
-				await U.flushDocument(db, docName, Y.encodeStateAsUpdate(ydoc), Y.encodeStateVector(ydoc));
-			} else if (applyNum === updates.length) {
-				/* empty */
-			} else if (applyNum !== updates.length) {
-				// 情况3: 无法应用所有更新，记录警告
-				console.warn(
+			// 检查是否所有更新都已应用
+			const allUpdatesApplied = applyNum === updates.length;
+
+			// 设置应用状态
+			ydoc.getMap(APPLY_FULL_STATUS).set('status', allUpdatesApplied);
+
+			if (allUpdatesApplied) {
+				// 判断是否需要执行文档刷新
+				if (updates.length > this.flushSize) {
+					// 更新数量超过阈值且全部应用成功，执行文档刷新
+					await U.flushDocument(
+						db,
+						docName,
+						Y.encodeStateAsUpdate(ydoc),
+						Y.encodeStateVector(ydoc),
+					);
+				}
+			} else {
+				// 未能全部应用成功，记录警告
+				console.log(
 					`Failed to apply all updates to document "${docName}". Applied ${applyNum}/${updates.length} updates.`,
 				);
 			}
