@@ -64,6 +64,17 @@ export class MongoAdapter {
 	}
 
 	/**
+	 * Ensure indexes for the collection to optimize queries.
+	 * 只在首次写入时调用即可，无需判断是否已存在。
+	 * @param {string} collectionName
+	 * @returns {Promise<void>}
+	 */
+	async ensureIndexes(collectionName) {
+		const collection = this.db.collection(collectionName);
+		await collection.createIndex({ docName: 1, clock: 1 });
+	}
+
+	/**
 	 *
 	 * @param {import('mongodb').Filter<import('mongodb').Document>} query
 	 * @param {{limit?: number; reverse?: boolean;}} [options]

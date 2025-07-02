@@ -188,6 +188,11 @@ export const storeUpdate = async (db, docName, update) => {
 		Y.applyUpdate(ydoc, update);
 		const sv = Y.encodeStateVector(ydoc);
 		await writeStateVector(db, docName, sv, 0);
+		// ensure indexes on first write
+		if (typeof db.ensureIndexes === 'function') {
+			const collectionName = db._getCollectionName({ docName });
+			await db.ensureIndexes(collectionName);
+		}
 	}
 
 	// mongodb has a maximum document size of 16MB;
